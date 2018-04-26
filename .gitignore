@@ -4,3 +4,5 @@ target/
 *.nohead
 *.csv
 out/
+head.*
+index.*
