@@ -8,6 +8,7 @@ import java.util.List;
  */
 public class Hashload implements dbimpl {
 
+    private static final int DEFAULT_SAME_RECORD_SIZE = 10;
     private String key;
     private int tableSize = 0x1FFF;         //8192
     private int bucketSize = 16;
@@ -75,7 +76,7 @@ public class Hashload implements dbimpl {
                         if (rid != recCount) {
                             isNextRecord = false;
                         } else {
-                            generateIndex(bRecord, pageCount + 1, recordLen);
+                            generateIndex(bRecord, pageCount + 1, recordLen, pageSize);
                             recordLen += RECORD_SIZE;
                         }
                         recCount++;
@@ -111,11 +112,18 @@ public class Hashload implements dbimpl {
     private void saveIndex(int pageSize) {
         long start = System.currentTimeMillis();
         try {
-            FileOutputStream fout = new FileOutputStream(INDEX_FNAME + pageSize);
-            ObjectOutputStream oos = new ObjectOutputStream(fout);
-            oos.writeObject(indexTable);
-            oos.flush();
-            oos.close();
+            BufferedWriter fw = new BufferedWriter(new FileWriter(INDEX_FNAME + pageSize));
+            for (List<IndexInfo> infoList : indexTable) {
+                if (!infoList.isEmpty()) {
+                    for (IndexInfo indexInfo : infoList) {
+                        fw.write(indexInfo.toString());
+                        fw.write(" ");
+                    }
+                }
+                fw.newLine();
+            }
+            fw.flush();
+            fw.close();
             long end = System.currentTimeMillis();
             System.out.println("Save index file costs: " + (end - start) + "ms");
         } catch (FileNotFoundException e) {
@@ -127,23 +135,29 @@ public class Hashload implements dbimpl {
     }
 
 
-    private void generateIndex(byte[] record, int pageNum, int rowNum) {
+    private void generateIndex(byte[] record, int pageNum, int rowNum, int pageSize) {
         String colValue = getColValue(record, key);
+        if (null == colValue || colValue.trim().equals("")) {
+            return;
+        }
+        colValue=colValue.trim().toLowerCase();
+
         int hashIndex = indexFor(colValue);
+        int realPosition = pageNum * pageSize + rowNum * RECORD_SIZE;
 
         //to handle collisions
         boolean hasIndex = false;
         List<IndexInfo> indexInfos = indexTable.get(hashIndex);
         for (IndexInfo info : indexInfos) {
-            if (colValue.equalsIgnoreCase(info.getValue())) {
-                info.addItem(pageNum, rowNum);
+            if (colValue.equals(info.getValue())) {
+                info.addPosition(realPosition);
                 hasIndex = true;
                 break;
             }
         }
 
         if (!hasIndex) {
-            IndexInfo indexInfo = new IndexInfo(colValue, pageNum, rowNum);
+            IndexInfo indexInfo = new IndexInfo(DEFAULT_SAME_RECORD_SIZE, colValue, realPosition);
             indexInfos.add(indexInfo);
         }
 
@@ -159,7 +173,7 @@ public class Hashload implements dbimpl {
 
     private int indexFor(String value) {
         int hashCode = value.trim().toLowerCase().hashCode();
-        int index = Math.abs(hashCode) & tableSize;
+        int index = Math.abs(hashCode) % tableSize;
         return index;
     }
 

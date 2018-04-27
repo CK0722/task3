@@ -1,12 +1,12 @@
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * data structure describing index information
  */
 public class IndexInfo implements Serializable {
     private static final long serialVersionUID = -3284879889186446978L;
+    private static final String POS_SEP = ",";
+    private static final String CONTENT_SEP = ":";
 
     /**
      * the specified value
@@ -14,23 +14,23 @@ public class IndexInfo implements Serializable {
     private String value;
 
     /**
-     * a set records the index information
+     * record the physical address of  data
      */
-    private List<IndexItem> items;
+    private StringBuffer position;
 
-    public IndexInfo() {
-        items = new ArrayList<>(16);
+    public IndexInfo(int capcity,String value) {
+        this.value=value;
+        this.position = new StringBuffer(capcity);
     }
 
-    public IndexInfo(String value, int page, int row) {
-        items = new ArrayList<>(16);
-        this.value = value;
-        this.addItem(page, row);
+    public IndexInfo(int capcity,String value, int pos) {
+        this.value=value;
+        this.position = new StringBuffer(capcity);
+        this.position.append(pos);
     }
 
-    public void addItem(int page, int row) {
-        IndexItem item = new IndexItem(page, row);
-        this.items.add(item);
+    public void addPosition(int pos) {
+        this.position.append(POS_SEP + pos);
     }
 
     public String getValue() {
@@ -41,50 +41,11 @@ public class IndexInfo implements Serializable {
         this.value = value;
     }
 
-    public List<IndexItem> getItems() {
-        return items;
+
+    @Override
+    public String toString() {
+        return this.value + CONTENT_SEP + this.position.toString();
     }
 
-    public void setItems(List<IndexItem> items) {
-        this.items = items;
-    }
 
-    public static class IndexItem implements Serializable {
-        private static final long serialVersionUID = -2410945364046324694L;
-
-        /**
-         * the page number of a specified value in the dataset
-         */
-        private int pageNum;
-
-        /**
-         * the row number of a specified value in a specified page in the dataset
-         */
-        private int row;
-
-        public IndexItem(int pageNum, int row) {
-            this.pageNum = pageNum;
-            this.row = row;
-        }
-
-        public static long getSerialVersionUID() {
-            return serialVersionUID;
-        }
-
-        public int getPageNum() {
-            return pageNum;
-        }
-
-        public void setPageNum(int pageNum) {
-            this.pageNum = pageNum;
-        }
-
-        public int getRow() {
-            return row;
-        }
-
-        public void setRow(int row) {
-            this.row = row;
-        }
-    }
 }
