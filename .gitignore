@@ -4,5 +4,5 @@ target/
 *.nohead
 *.csv
 out/
-head.*
+heap.*
 index.*
