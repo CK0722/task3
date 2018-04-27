@@ -9,7 +9,7 @@ import java.util.List;
 public class Hashload implements dbimpl {
 
     private String key;
-    private int tableSize = 8192;
+    private int tableSize = 0x1FFF;         //8192
     private int bucketSize = 16;
     private List<List<IndexInfo>> indexTable;
 
@@ -109,12 +109,15 @@ public class Hashload implements dbimpl {
      * @param pageSize
      */
     private void saveIndex(int pageSize) {
+        long start = System.currentTimeMillis();
         try {
             FileOutputStream fout = new FileOutputStream(INDEX_FNAME + pageSize);
             ObjectOutputStream oos = new ObjectOutputStream(fout);
             oos.writeObject(indexTable);
             oos.flush();
             oos.close();
+            long end = System.currentTimeMillis();
+            System.out.println("Save index file costs: " + (end - start) + "ms");
         } catch (FileNotFoundException e) {
             System.out.println("File: " + INDEX_FNAME + pageSize + " not found.");
         } catch (IOException e) {
@@ -156,7 +159,7 @@ public class Hashload implements dbimpl {
 
     private int indexFor(String value) {
         int hashCode = value.trim().toLowerCase().hashCode();
-        int index = Math.abs(hashCode) % tableSize;
+        int index = Math.abs(hashCode) & tableSize;
         return index;
     }
 
