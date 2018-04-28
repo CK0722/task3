@@ -8,19 +8,32 @@ import java.util.List;
  */
 public class Hashload implements dbimpl {
 
+    /**
+     * The largest possible table capacity.  This value must be
+     * exactly 1<<30 to stay within Java array allocation and indexing
+     * bounds for power of two table sizes, and is further required
+     * because the top two bits of 32bit hash fields are used for
+     * control purposes.
+     */
+    private static final int MAXIMUM_CAPACITY = 1 << 30;
+    private static final int HIGH_MASK = 0xFFFF0000;
+    private static final int LOW_MASK = 0x0000FFFF;
     private static final int DEFAULT_SAME_RECORD_SIZE = 10;
+    private static final String INDEX_SEP = "#";
     private String key;
-    private int tableSize = 0x1FFF;         //8192
-    private int bucketSize = 16;
+    private int tableSize;
+    private int bucketSize;
+    private int modules;
     private List<List<IndexInfo>> indexTable;
 
     public Hashload(String key, int tableSize, int bucketSize) {
         this.key = key;
-        this.tableSize = tableSize;
+        this.tableSize = tableSizeFor(tableSize);
+        this.modules = this.tableSize - 1;
         this.bucketSize = bucketSize;
         this.indexTable = new ArrayList<>(tableSize);
         for (int i = 0; i < tableSize; ++i) {
-            indexTable.add(new ArrayList<>(bucketSize));
+            indexTable.add(new ArrayList<>(this.bucketSize));
         }
     }
 
@@ -117,7 +130,7 @@ public class Hashload implements dbimpl {
                 if (!infoList.isEmpty()) {
                     for (IndexInfo indexInfo : infoList) {
                         fw.write(indexInfo.toString());
-                        fw.write(" ");
+                        fw.write(INDEX_SEP);
                     }
                 }
                 fw.newLine();
@@ -140,7 +153,10 @@ public class Hashload implements dbimpl {
         if (null == colValue || colValue.trim().equals("")) {
             return;
         }
-        colValue=colValue.trim().toLowerCase();
+        if ("\t".equals(colValue) || "\r".equals(colValue) || "\n".equals(colValue) || "\r\n".equals(colValue)) {
+            return;
+        }
+        colValue = colValue.trim().toLowerCase();
 
         int hashIndex = indexFor(colValue);
         int realPosition = pageNum * pageSize + rowNum * RECORD_SIZE;
@@ -171,12 +187,30 @@ public class Hashload implements dbimpl {
         return colValue;
     }
 
+
     private int indexFor(String value) {
-        int hashCode = value.trim().toLowerCase().hashCode();
-        int index = Math.abs(hashCode) % tableSize;
+        int h = value.trim().toLowerCase().hashCode();
+        h = h ^ (h >>> 16);
+        h = Math.abs(h);
+
+        int index = h & this.modules;
         return index;
     }
 
+
+    /**
+     * Returns a power of two table size for the given desired capacity.
+     * See Hackers Delight, sec 3.2
+     */
+    private static final int tableSizeFor(int c) {
+        int n = c - 1;
+        n |= n >>> 1;
+        n |= n >>> 2;
+        n |= n >>> 4;
+        n |= n >>> 8;
+        n |= n >>> 16;
+        return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+    }
 
     @Override
     public boolean isInteger(String s) {

@@ -1,27 +1,43 @@
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+
 /**
  * query data with index
  */
 public class Hashquery implements dbimpl {
 
     public static void main(String[] args) {
-
         Hashquery hashquery = new Hashquery();
-        long startTime = System.currentTimeMillis();
-        hashquery.readArguments(args);
-        long endTime = System.currentTimeMillis();
+        try {
+            hashquery.loadIndexFile(4096);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        System.out.println("Query time: " + (endTime - startTime) + "ms");
+
+//        long startTime = System.currentTimeMillis();
+//        hashquery.readArguments(args);
+//        long endTime = System.currentTimeMillis();
+//
+//        System.out.println("Query time: " + (endTime - startTime) + "ms");
     }
 
     @Override
     public void readArguments(String[] args) {
         if (args.length == 2) {
             if (isNotEmpty(args[0]) && isInteger(args[1])) {
-
+                queryText(args[0],Integer.parseInt(args[1]));
             }
         } else {
             System.out.println("Error: only pass in two argument");
         }
+    }
+
+
+    private void queryText(String text, int pageSize) {
+
     }
 
     @Override
@@ -34,6 +50,14 @@ public class Hashquery implements dbimpl {
             return false;
         }
         return true;
+    }
+
+    public void loadIndexFile(int pageSize) throws IOException {
+        BufferedReader br = new BufferedReader(new FileReader(INDEX_FNAME + pageSize));
+        String line;
+        while (null != (line = br.readLine())) {
+            System.out.println(line);
+        }
     }
 
 }
