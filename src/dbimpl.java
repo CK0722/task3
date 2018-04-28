@@ -7,6 +7,7 @@ public interface dbimpl {
     public static final String HEAP_FNAME = "heap.";
     public static final String INDEX_FNAME = "index.";
     public static final String ENCODING = "utf-8";
+    public static final String INDEX_SEP = "#";
 
     // fixed/variable lengths
     public static final int RECORD_SIZE = 297;

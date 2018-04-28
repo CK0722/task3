@@ -16,10 +16,9 @@ public class Hashload implements dbimpl {
      * control purposes.
      */
     private static final int MAXIMUM_CAPACITY = 1 << 30;
-    private static final int HIGH_MASK = 0xFFFF0000;
-    private static final int LOW_MASK = 0x0000FFFF;
     private static final int DEFAULT_SAME_RECORD_SIZE = 10;
-    private static final String INDEX_SEP = "#";
+    private static final int DEFAULT_TABLE_SIZE = 8192;
+    private static final int DEFAULT_BUCKET_SIZE = 16;
     private String key;
     private int tableSize;
     private int bucketSize;
@@ -37,9 +36,20 @@ public class Hashload implements dbimpl {
         }
     }
 
+    public Hashload(String key) {
+        this.key = key;
+        this.tableSize = DEFAULT_TABLE_SIZE;
+        this.modules = this.tableSize - 1;
+        this.bucketSize = DEFAULT_BUCKET_SIZE;
+        this.indexTable = new ArrayList<>(tableSize);
+        for (int i = 0; i < tableSize; ++i) {
+            indexTable.add(new ArrayList<>(this.bucketSize));
+        }
+    }
+
 
     public static void main(String[] args) {
-        Hashload hashload = new Hashload(Column.BN_NAME.getName(), 8192, 16);
+        Hashload hashload = new Hashload(Column.BN_NAME.getName(), 8192, 400);
         long startTime = System.currentTimeMillis();
         hashload.readArguments(args);
         long endTime = System.currentTimeMillis();
@@ -59,6 +69,59 @@ public class Hashload implements dbimpl {
         }
     }
 
+    @Override
+    public boolean isInteger(String s) {
+        boolean isValidInt = false;
+        try {
+            Integer.parseInt(s);
+            isValidInt = true;
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
+        }
+        return isValidInt;
+    }
+
+
+    public void loadIndexTable(int pageSize) throws IOException {
+        long start = System.currentTimeMillis();
+        RandomAccessFile reader = new RandomAccessFile(INDEX_FNAME + pageSize, "r");
+        String line;
+        int lineNum = 0;
+        while (null != (line = reader.readLine())) {
+            String[] split = line.split(INDEX_SEP);
+            for (String index : split) {
+                this.indexTable.get(lineNum).add(new IndexInfo(index));
+            }
+            ++lineNum;
+        }
+        long end = System.currentTimeMillis();
+        System.out.println("Load index table costs: " + (end - start) + "ms");
+    }
+
+    public List<IndexInfo> loadIndexInfo(int pageSize, int index) throws IOException {
+        long start = System.currentTimeMillis();
+        ArrayList<IndexInfo> indexInfos = new ArrayList<>(this.bucketSize);
+        RandomAccessFile reader = new RandomAccessFile(INDEX_FNAME + pageSize, "r");
+        int lineNum = 0;
+        while (lineNum != index) {
+            reader.readLine();
+            ++lineNum;
+        }
+
+        String line = reader.readLine();
+        String[] split = line.split(INDEX_SEP);
+        for (String str : split) {
+            indexInfos.add(new IndexInfo(str));
+        }
+        long end = System.currentTimeMillis();
+        System.out.println("Load index table costs: " + (end - start) + "ms");
+        return indexInfos;
+    }
+
+
+    public List<List<IndexInfo>> getIndexTable() {
+        return indexTable;
+    }
 
     private void createIndex(int pageSize) {
         File heapfile = new File(HEAP_FNAME + pageSize);
@@ -89,7 +152,7 @@ public class Hashload implements dbimpl {
                         if (rid != recCount) {
                             isNextRecord = false;
                         } else {
-                            generateIndex(bRecord, pageCount + 1, recordLen, pageSize);
+                            generateIndex(bRecord, pageCount, recordLen, pageSize);
                             recordLen += RECORD_SIZE;
                         }
                         recCount++;
@@ -147,13 +210,20 @@ public class Hashload implements dbimpl {
 
     }
 
+    private boolean isValidStr(String s) {
+        if (null == s || s.trim().equals("")) {
+            return false;
+        }
+        if ("\t".equals(s) || "\r".equals(s) || "\n".equals(s) || "\r\n".equals(s)) {
+            return false;
+        }
+
+        return true;
+    }
 
     private void generateIndex(byte[] record, int pageNum, int rowNum, int pageSize) {
         String colValue = getColValue(record, key);
-        if (null == colValue || colValue.trim().equals("")) {
-            return;
-        }
-        if ("\t".equals(colValue) || "\r".equals(colValue) || "\n".equals(colValue) || "\r\n".equals(colValue)) {
+        if (!isValidStr(colValue)) {
             return;
         }
         colValue = colValue.trim().toLowerCase();
@@ -188,7 +258,7 @@ public class Hashload implements dbimpl {
     }
 
 
-    private int indexFor(String value) {
+    public int indexFor(String value) {
         int h = value.trim().toLowerCase().hashCode();
         h = h ^ (h >>> 16);
         h = Math.abs(h);
@@ -212,15 +282,5 @@ public class Hashload implements dbimpl {
         return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
     }
 
-    @Override
-    public boolean isInteger(String s) {
-        boolean isValidInt = false;
-        try {
-            Integer.parseInt(s);
-            isValidInt = true;
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        }
-        return isValidInt;
-    }
+
 }
