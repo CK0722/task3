@@ -24,7 +24,7 @@ public class Hashquery implements dbimpl {
     public void readArguments(String[] args) {
         if (args.length == 2) {
             if (isNotEmpty(args[0]) && isInteger(args[1])) {
-                queryText(args[0], Integer.parseInt(args[1]), 8192, 400, Column.BN_NAME.getName());
+                queryText(args[0], Integer.parseInt(args[1]), 8192, 400, Column.BN_ABN.getName());
             }
         } else {
             System.out.println("Error: only pass in two argument");
@@ -38,7 +38,7 @@ public class Hashquery implements dbimpl {
             Hashload hashload = new Hashload(key, tableSize, bucketSize);
 
             int index = hashload.indexFor(text);
-            List<IndexInfo> indexEntries = hashload.loadIndexInfo(pageSize,index);;
+            List<IndexInfo> indexEntries = hashload.loadIndexInfo(pageSize,index,text);;
 
             //locate the record position  in the heap file based on the index value
             for (IndexInfo entry : indexEntries) {

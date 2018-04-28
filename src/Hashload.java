@@ -49,7 +49,7 @@ public class Hashload implements dbimpl {
 
 
     public static void main(String[] args) {
-        Hashload hashload = new Hashload(Column.BN_NAME.getName(), 8192, 400);
+        Hashload hashload = new Hashload(Column.BN_ABN.getName(), 8192, 400);
         long startTime = System.currentTimeMillis();
         hashload.readArguments(args);
         long endTime = System.currentTimeMillis();
@@ -98,7 +98,7 @@ public class Hashload implements dbimpl {
         System.out.println("Load index table costs: " + (end - start) + "ms");
     }
 
-    public List<IndexInfo> loadIndexInfo(int pageSize, int index) throws IOException {
+    public List<IndexInfo> loadIndexInfo(int pageSize, int index, String text) throws IOException {
         long start = System.currentTimeMillis();
         ArrayList<IndexInfo> indexInfos = new ArrayList<>(this.bucketSize);
         RandomAccessFile reader = new RandomAccessFile(INDEX_FNAME + pageSize, "r");
@@ -111,7 +111,10 @@ public class Hashload implements dbimpl {
         String line = reader.readLine();
         String[] split = line.split(INDEX_SEP);
         for (String str : split) {
-            indexInfos.add(new IndexInfo(str));
+            if (str.startsWith(text.toLowerCase())) {
+                indexInfos.add(new IndexInfo(str));
+                break;
+            }
         }
         long end = System.currentTimeMillis();
         System.out.println("Load index table costs: " + (end - start) + "ms");
@@ -221,7 +224,7 @@ public class Hashload implements dbimpl {
         return true;
     }
 
-    private void generateIndex(byte[] record, int pageNum, int rowNum, int pageSize) {
+    private void generateIndex(byte[] record, int pageNum, int rowOffset, int pageSize) {
         String colValue = getColValue(record, key);
         if (!isValidStr(colValue)) {
             return;
@@ -229,7 +232,7 @@ public class Hashload implements dbimpl {
         colValue = colValue.trim().toLowerCase();
 
         int hashIndex = indexFor(colValue);
-        int realPosition = pageNum * pageSize + rowNum * RECORD_SIZE;
+        int realPosition = pageNum * pageSize + rowOffset;
 
         //to handle collisions
         boolean hasIndex = false;
