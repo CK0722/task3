@@ -39,7 +39,7 @@ public class Hashquery implements dbimpl {
             int index = hashload.indexFor(text);
 
             //locate the record position  in the heap file based on the index value
-            List<IndexInfo> indexEntries = hashload.loadIndexInfo(pageSize, index);
+            List<IndexInfo> indexEntries = hashload.loadIndex(pageSize, index);
             List<Integer> positions = null;
             for (IndexInfo entry : indexEntries) {
                 //has found the record positions
@@ -58,7 +58,7 @@ public class Hashquery implements dbimpl {
 //                positions.set(i, positions.get(i) - initialPos);
 //            }
 
-            RandomAccessFile reader = new RandomAccessFile(HEAP_FNAME + pageSize, "r");
+            RandomAccessFile reader = new RandomAccessFile(HEAP_FNAME + DEFAULT_HEAP_PAGE_SIZE, "r");
             byte[] record = new byte[RECORD_SIZE];
             positions.forEach(pos -> {
                 try {
