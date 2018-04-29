@@ -98,7 +98,7 @@ public class Hashload implements dbimpl {
         System.out.println("Load index table costs: " + (end - start) + "ms");
     }
 
-    public List<IndexInfo> loadIndexInfo(int pageSize, int index, String text) throws IOException {
+    public List<IndexInfo> loadIndexInfo(int pageSize, int index) throws IOException {
         long start = System.currentTimeMillis();
         ArrayList<IndexInfo> indexInfos = new ArrayList<>(this.bucketSize);
         RandomAccessFile reader = new RandomAccessFile(INDEX_FNAME + pageSize, "r");
@@ -111,10 +111,7 @@ public class Hashload implements dbimpl {
         String line = reader.readLine();
         String[] split = line.split(INDEX_SEP);
         for (String str : split) {
-            if (str.startsWith(text.toLowerCase())) {
-                indexInfos.add(new IndexInfo(str));
-                break;
-            }
+            indexInfos.add(new IndexInfo(str));
         }
         long end = System.currentTimeMillis();
         System.out.println("Load index table costs: " + (end - start) + "ms");
@@ -257,6 +254,7 @@ public class Hashload implements dbimpl {
         Column columnInfo = Column.getColumnInfo(key);
         String entry = new String(record);
         String colValue = entry.substring(columnInfo.getOffset(), columnInfo.getOffset() + columnInfo.getLength());
+
         return colValue;
     }
 

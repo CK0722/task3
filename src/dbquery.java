@@ -31,7 +31,7 @@ public class dbquery implements dbimpl {
     public void readArguments(String args[]) {
         if (args.length == 2) {
             if (isInteger(args[1])) {
-                readHeap(args[0], Integer.parseInt(args[1]));
+                readHeap(args[0], Column.BN_ABN.getName(), Integer.parseInt(args[1]));
             }
         } else {
             System.out.println("Error: only pass in two arguments");
@@ -60,10 +60,11 @@ public class dbquery implements dbimpl {
     /**
      * read heapfile by page
      *
-     * @param name
+     * @param text
+     * @param key
      * @param pagesize
      */
-    public void readHeap(String name, int pagesize) {
+    public void readHeap(String text, String key, int pagesize) {
         File heapfile = new File(HEAP_FNAME + pagesize);
         int intSize = 4;
         int pageCount = 0;
@@ -93,7 +94,7 @@ public class dbquery implements dbimpl {
                         if (rid != recCount) {
                             isNextRecord = false;
                         } else {
-                            printRecord(bRecord, name);
+                            printRecord(bRecord, key, text);
                             recordLen += RECORD_SIZE;
                         }
                         recCount++;
@@ -123,14 +124,14 @@ public class dbquery implements dbimpl {
      * returns records containing the argument text from shell
      *
      * @param rec
-     * @param input
+     * @param key
+     * @param text
      */
-    public void printRecord(byte[] rec, String input) {
+    public void printRecord(byte[] rec, String key, String text) {
+        Column columnInfo = Column.getColumnInfo(key);
         String record = new String(rec);
-        String BN_NAME = record
-                .substring(RID_SIZE + REGISTER_NAME_SIZE,
-                        RID_SIZE + REGISTER_NAME_SIZE + BN_NAME_SIZE);
-        if (BN_NAME.toLowerCase().contains(input.toLowerCase())) {
+        String colValue = record.substring(columnInfo.getOffset(), columnInfo.getOffset() + columnInfo.getLength());
+        if (colValue.toLowerCase().contains(text.toLowerCase())) {
             System.out.println(record);
         }
     }

@@ -36,31 +36,39 @@ public class Hashquery implements dbimpl {
         try {
             //calculate the index value based on the text
             Hashload hashload = new Hashload(key, tableSize, bucketSize);
-
             int index = hashload.indexFor(text);
-            List<IndexInfo> indexEntries = hashload.loadIndexInfo(pageSize,index,text);;
 
             //locate the record position  in the heap file based on the index value
+            List<IndexInfo> indexEntries = hashload.loadIndexInfo(pageSize, index);
+            List<Integer> positions = null;
             for (IndexInfo entry : indexEntries) {
                 //has found the record positions
                 if (text.equalsIgnoreCase(entry.getValue())) {
-                    BufferedInputStream br = new BufferedInputStream(new FileInputStream(HEAP_FNAME + pageSize));
-                    List<Integer> positions = entry.getPositions();
-                    byte[] record = new byte[RECORD_SIZE];
-                    positions.forEach(pos -> {
-                        try {
-                            br.skip(pos);
-                            br.read(record, 0, RECORD_SIZE);
-                            printRecord(record);
-                            br.mark(0);
-                            br.reset();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    });
+                    positions = entry.getPositions();
                     break;
                 }
             }
+
+            //no record
+            if (null == positions || positions.isEmpty()) {
+                return;
+            }
+//            Integer initialPos = positions.get(0);
+//            for (int i = 1; i < positions.size(); i++) {
+//                positions.set(i, positions.get(i) - initialPos);
+//            }
+
+            RandomAccessFile reader = new RandomAccessFile(HEAP_FNAME + pageSize, "r");
+            byte[] record = new byte[RECORD_SIZE];
+            positions.forEach(pos -> {
+                try {
+                    reader.seek(pos);
+                    reader.read(record, 0, RECORD_SIZE);
+                    printRecord(record);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
