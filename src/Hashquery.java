@@ -6,13 +6,19 @@ import java.util.List;
  */
 public class Hashquery implements dbimpl {
 
+    private int pageSize;
+    private String queryText;
+
+    public Hashquery() {
+    }
+
+    public Hashquery(int pageSize, String queryText) {
+        this.queryText = queryText;
+        this.pageSize = pageSize;
+    }
+
     public static void main(String[] args) {
         Hashquery hashquery = new Hashquery();
-//        try {
-//            hashquery.loadIndexFile(4096);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
         long startTime = System.currentTimeMillis();
         hashquery.readArguments(args);
         long endTime = System.currentTimeMillis();
@@ -24,7 +30,9 @@ public class Hashquery implements dbimpl {
     public void readArguments(String[] args) {
         if (args.length == 2) {
             if (isNotEmpty(args[0]) && isInteger(args[1])) {
-                queryText(args[0], Integer.parseInt(args[1]), 8192, 400, Column.BN_ABN.getName());
+                this.queryText = args[0];
+                this.pageSize = Integer.parseInt(args[1]);
+                this.queryText();
             }
         } else {
             System.out.println("Error: only pass in two argument");
@@ -32,18 +40,18 @@ public class Hashquery implements dbimpl {
     }
 
 
-    private void queryText(String text, int pageSize, int tableSize, int bucketSize, String key) {
+    private void queryText() {
         try {
             //calculate the index value based on the text
-            Hashload hashload = new Hashload(key, tableSize, bucketSize);
-            int index = hashload.indexFor(text);
+            Hashload hashload = new Hashload(this.pageSize);
+            int index = hashload.indexFor(this.queryText);
 
             //locate the record position  in the heap file based on the index value
-            List<IndexInfo> indexEntries = hashload.loadIndex(pageSize, index);
+            List<IndexInfo> indexEntries = hashload.loadIndex(index);
             List<Integer> positions = null;
             for (IndexInfo entry : indexEntries) {
                 //has found the record positions
-                if (text.equalsIgnoreCase(entry.getValue())) {
+                if (this.queryText.equalsIgnoreCase(entry.getValue())) {
                     positions = entry.getPositions();
                     break;
                 }
@@ -53,12 +61,9 @@ public class Hashquery implements dbimpl {
             if (null == positions || positions.isEmpty()) {
                 return;
             }
-//            Integer initialPos = positions.get(0);
-//            for (int i = 1; i < positions.size(); i++) {
-//                positions.set(i, positions.get(i) - initialPos);
-//            }
 
-            RandomAccessFile reader = new RandomAccessFile(HEAP_FNAME + DEFAULT_HEAP_PAGE_SIZE, "r");
+            dbload dbload = new dbload();
+            RandomAccessFile reader = new RandomAccessFile(dbload.loadHeapFile(), "r");
             byte[] record = new byte[RECORD_SIZE];
             positions.forEach(pos -> {
                 try {
@@ -93,24 +98,34 @@ public class Hashquery implements dbimpl {
         return isValidInt;
     }
 
-    public boolean isNotEmpty(String s) {
+    @Override
+    public boolean isValidStr(String str) {
+        return false;
+    }
+
+
+    public void printRecord(byte[] rec) {
+        String record = new String(rec);
+        System.out.println(record);
+    }
+
+
+    private boolean isNotEmpty(String s) {
         if (null == s || s.trim().equals("")) {
             return false;
         }
         return true;
     }
 
-    public void loadIndexFile(int pageSize) throws IOException {
-        BufferedReader br = new BufferedReader(new FileReader(INDEX_FNAME + pageSize));
+    private void printIndexFile(int pageSize) throws IOException {
+        Hashload hashload = new Hashload(pageSize);
+        File indexFile = hashload.loadIndexFile();
+        BufferedReader br = new BufferedReader(new FileReader(indexFile));
         String line;
         while (null != (line = br.readLine())) {
             System.out.println(line);
         }
     }
 
-    public void printRecord(byte[] rec) {
-        String record = new String(rec);
-        System.out.println(record);
-    }
 
 }

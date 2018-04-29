@@ -6,6 +6,22 @@ import java.nio.ByteBuffer;
  */
 
 public class dbload implements dbimpl {
+
+    private static final int DEFAULT_HEAP_PAGE_SIZE = 4096;
+    private int pageSize;
+
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public dbload() {
+        this.pageSize = DEFAULT_HEAP_PAGE_SIZE;
+    }
+
+    public dbload(int pageSize) {
+        this.pageSize = pageSize;
+    }
+
     // initialize
     public static void main(String args[]) {
         dbload load = new dbload();
@@ -27,7 +43,8 @@ public class dbload implements dbimpl {
     public void readArguments(String args[]) {
         if (args.length == 3) {
             if (args[0].equals("-p") && isInteger(args[1])) {
-                readFile(args[2], Integer.parseInt(args[1]));
+                this.pageSize = Integer.parseInt(args[1]);
+                readFile(args[2]);
             }
         } else {
             System.out.println("Error: only pass in three arguments");
@@ -53,15 +70,19 @@ public class dbload implements dbimpl {
         return isValidInt;
     }
 
+    @Override
+    public boolean isValidStr(String str) {
+        return false;
+    }
+
 
     /**
      * read .csv file using buffered reader
      *
      * @param fileName
-     * @param pageSize
      */
-    public void readFile(String fileName, int pageSize) {
-        File heapfile = new File(HEAP_FNAME + pageSize);
+    public void readFile(String fileName) {
+        File heapfile = loadHeapFile();
         BufferedReader br = null;
         FileOutputStream fos = null;
         String line = "";
@@ -111,6 +132,10 @@ public class dbload implements dbimpl {
         }
         System.out.println("Page total: " + pageCount);
         System.out.println("Record total: " + recCount);
+    }
+
+    public File loadHeapFile() {
+        return new File(HEAP_FNAME + this.pageSize);
     }
 
 

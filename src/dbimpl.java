@@ -75,12 +75,13 @@ public interface dbimpl {
             + BN_STATE_NUM_SIZE
             + BN_STATE_OF_REG_SIZE;
 
-    public static final int DEFAULT_HEAP_PAGE_SIZE = 4096;
 
 
     public void readArguments(String args[]);
 
     public boolean isInteger(String s);
+
+    public boolean isValidStr(String str);
 
 
     public static enum Column {

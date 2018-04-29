@@ -56,6 +56,11 @@ public class dbquery implements dbimpl {
         return isValidInt;
     }
 
+    @Override
+    public boolean isValidStr(String str) {
+        return false;
+    }
+
 
     /**
      * read heapfile by page
