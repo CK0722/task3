@@ -75,9 +75,13 @@ public interface dbimpl {
             + BN_STATE_NUM_SIZE
             + BN_STATE_OF_REG_SIZE;
 
+
+
     public void readArguments(String args[]);
 
     public boolean isInteger(String s);
+
+    public boolean isValidStr(String str);
 
 
     public static enum Column {

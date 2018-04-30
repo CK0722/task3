@@ -16,10 +16,27 @@ public class Hashload implements dbimpl {
      * control purposes.
      */
     private static final int MAXIMUM_CAPACITY = 1 << 30;
+
+
+    /**
+     * the default value of the size of the positions of the same record
+     */
     private static final int DEFAULT_SAME_RECORD_SIZE = 10;
+
+
+    /**
+     * the default size of the index table
+     */
     private static final int DEFAULT_TABLE_SIZE = 8192;
-    private static final int DEFAULT_BUCKET_SIZE = 16;
+
+
+    /**
+     * the default size of each bucket of the index table
+     */
+    private static final int DEFAULT_BUCKET_SIZE = 400;
+
     private String key;
+    private int pageSize;
     private int tableSize;
     private int bucketSize;
     private int modules;
@@ -27,29 +44,44 @@ public class Hashload implements dbimpl {
 
     public Hashload(String key, int tableSize, int bucketSize) {
         this.key = key;
-        this.tableSize = tableSizeFor(tableSize);
-        this.modules = this.tableSize - 1;
+        this.tableSize = tableSize;
         this.bucketSize = bucketSize;
-        this.indexTable = new ArrayList<>(tableSize);
-        for (int i = 0; i < tableSize; ++i) {
-            indexTable.add(new ArrayList<>(this.bucketSize));
-        }
+        init();
+    }
+
+    public Hashload(String key, int pageSize) {
+        this.key = key;
+        this.pageSize = pageSize;
+        this.tableSize = DEFAULT_TABLE_SIZE;
+        this.bucketSize = DEFAULT_BUCKET_SIZE;
+        init();
+    }
+
+    public Hashload(int pageSize) {
+        this.pageSize = pageSize;
+        this.tableSize = DEFAULT_TABLE_SIZE;
+        this.bucketSize = DEFAULT_BUCKET_SIZE;
+        init();
     }
 
     public Hashload(String key) {
         this.key = key;
         this.tableSize = DEFAULT_TABLE_SIZE;
-        this.modules = this.tableSize - 1;
         this.bucketSize = DEFAULT_BUCKET_SIZE;
-        this.indexTable = new ArrayList<>(tableSize);
+        init();
+    }
+
+    private void init() {
+        this.tableSize = tableSizeFor(this.tableSize);
+        this.modules = this.tableSize - 1;
+        this.indexTable = new ArrayList<>(this.tableSize);
         for (int i = 0; i < tableSize; ++i) {
-            indexTable.add(new ArrayList<>(this.bucketSize));
+            this.indexTable.add(new ArrayList<>(this.bucketSize));
         }
     }
 
-
     public static void main(String[] args) {
-        Hashload hashload = new Hashload(Column.BN_ABN.getName(), 8192, 400);
+        Hashload hashload = new Hashload(Column.BN_ABN.getName());
         long startTime = System.currentTimeMillis();
         hashload.readArguments(args);
         long endTime = System.currentTimeMillis();
@@ -62,7 +94,8 @@ public class Hashload implements dbimpl {
     public void readArguments(String[] args) {
         if (args.length == 1) {
             if (isInteger(args[0])) {
-                createIndex(Integer.parseInt(args[0]));
+                this.pageSize = Integer.parseInt(args[0]);
+                createIndex();
             }
         } else {
             System.out.println("Error: only pass in one argument");
@@ -81,50 +114,58 @@ public class Hashload implements dbimpl {
         return isValidInt;
     }
 
-
-    public void loadIndexTable(int pageSize) throws IOException {
-        long start = System.currentTimeMillis();
-        RandomAccessFile reader = new RandomAccessFile(INDEX_FNAME + pageSize, "r");
-        String line;
-        int lineNum = 0;
-        while (null != (line = reader.readLine())) {
-            String[] split = line.split(INDEX_SEP);
-            for (String index : split) {
-                this.indexTable.get(lineNum).add(new IndexInfo(index));
-            }
-            ++lineNum;
+    @Override
+    public boolean isValidStr(String s) {
+        if (null == s || s.trim().equals("")) {
+            return false;
         }
-        long end = System.currentTimeMillis();
-        System.out.println("Load index table costs: " + (end - start) + "ms");
+        if ("\t".equals(s) || "\r".equals(s) || "\n".equals(s) || "\r\n".equals(s)) {
+            return false;
+        }
+
+        return true;
     }
 
-    public List<IndexInfo> loadIndexInfo(int pageSize, int index) throws IOException {
+
+    /**
+     * @param index the value of the posiotion of  index information(the bucket location)
+     * @return index information
+     * @throws IOException
+     */
+    public List<IndexInfo> loadIndex(int index) throws IOException {
         long start = System.currentTimeMillis();
         ArrayList<IndexInfo> indexInfos = new ArrayList<>(this.bucketSize);
-        RandomAccessFile reader = new RandomAccessFile(INDEX_FNAME + pageSize, "r");
-        int lineNum = 0;
-        while (lineNum != index) {
-            reader.readLine();
-            ++lineNum;
-        }
 
-        String line = reader.readLine();
-        String[] split = line.split(INDEX_SEP);
+        byte[] indexRecord = new byte[this.pageSize];
+        FileInputStream fis = new FileInputStream(loadIndexFile());
+        fis.skip(this.pageSize * index);
+        fis.read(indexRecord, 0, this.pageSize);
+
+        String indexStr = new String(indexRecord);
+        String[] split = indexStr.split(INDEX_SEP);
         for (String str : split) {
             indexInfos.add(new IndexInfo(str));
         }
+
         long end = System.currentTimeMillis();
         System.out.println("Load index table costs: " + (end - start) + "ms");
         return indexInfos;
     }
 
 
-    public List<List<IndexInfo>> getIndexTable() {
-        return indexTable;
+    public File loadIndexFile() {
+        File file = new File(INDEX_FNAME + this.pageSize);
+        return file;
     }
 
-    private void createIndex(int pageSize) {
-        File heapfile = new File(HEAP_FNAME + pageSize);
+
+    /**
+     * record index information of each record in the heap file
+     */
+    private void createIndex() {
+        dbload dbload = new dbload();
+        File heapfile = dbload.loadHeapFile();
+        int defaultHeapFileSize = dbload.getPageSize();
         int intSize = 4;
         int pageCount = 0;
         int recCount = 0;
@@ -135,9 +176,9 @@ public class Hashload implements dbimpl {
         try {
             FileInputStream fis = new FileInputStream(heapfile);
             while (isNextPage) {
-                byte[] bPage = new byte[pageSize];
+                byte[] bPage = new byte[defaultHeapFileSize];
                 byte[] bPageNum = new byte[intSize];
-                fis.read(bPage, 0, pageSize);
+                fis.read(bPage, 0, defaultHeapFileSize);
                 System.arraycopy(bPage, bPage.length - intSize, bPageNum, 0, intSize);
 
                 // reading by record, return true to read the next record
@@ -152,7 +193,7 @@ public class Hashload implements dbimpl {
                         if (rid != recCount) {
                             isNextRecord = false;
                         } else {
-                            generateIndex(bRecord, pageCount, recordLen, pageSize);
+                            generateIndex(bRecord, pageCount, recordLen, defaultHeapFileSize);
                             recordLen += RECORD_SIZE;
                         }
                         recCount++;
@@ -171,9 +212,9 @@ public class Hashload implements dbimpl {
                 pageCount++;
             }
 
-            saveIndex(pageSize);
+            storeIndex();
         } catch (FileNotFoundException e) {
-            System.out.println("File: " + HEAP_FNAME + pageSize + " not found.");
+            System.out.println("File: " + heapfile.getName() + " not found.");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -182,46 +223,48 @@ public class Hashload implements dbimpl {
 
     /**
      * store the index file
-     *
-     * @param pageSize
      */
-    private void saveIndex(int pageSize) {
+    private void storeIndex() {
         long start = System.currentTimeMillis();
+        File indexFile = loadIndexFile();
         try {
-            BufferedWriter fw = new BufferedWriter(new FileWriter(INDEX_FNAME + pageSize));
+            FileOutputStream fout = new FileOutputStream(indexFile);
+            int occupy = 0;
             for (List<IndexInfo> infoList : indexTable) {
+                byte[] bPage = new byte[this.pageSize];
+                int totalBytes = 0;
                 if (!infoList.isEmpty()) {
                     for (IndexInfo indexInfo : infoList) {
-                        fw.write(indexInfo.toString());
-                        fw.write(INDEX_SEP);
+                        String indexs = indexInfo.toString() + INDEX_SEP;
+                        byte[] dataSrc = indexs.getBytes(ENCODING);
+                        System.arraycopy(dataSrc, 0, bPage, totalBytes, dataSrc.length);
+                        totalBytes += dataSrc.length;
                     }
+                    ++occupy;
                 }
-                fw.newLine();
+                fout.write(bPage);
             }
-            fw.flush();
-            fw.close();
+            fout.flush();
+            fout.close();
+            System.out.println("Page total: " + indexTable.size());
+            System.out.println("Occupy total: " + occupy);
             long end = System.currentTimeMillis();
             System.out.println("Save index file costs: " + (end - start) + "ms");
         } catch (FileNotFoundException e) {
-            System.out.println("File: " + INDEX_FNAME + pageSize + " not found.");
+            System.out.println("File: " + indexFile.getName() + " not found.");
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 
-    private boolean isValidStr(String s) {
-        if (null == s || s.trim().equals("")) {
-            return false;
-        }
-        if ("\t".equals(s) || "\r".equals(s) || "\n".equals(s) || "\r\n".equals(s)) {
-            return false;
-        }
 
-        return true;
-    }
-
-    private void generateIndex(byte[] record, int pageNum, int rowOffset, int pageSize) {
+    /**
+     * @param record              data
+     * @param pageNum             the page value of the record stored in the heap file
+     * @param rowOffset           the offset of the record in the page
+     * @param defaultHeapFileSize the maxinum of bytes in each page of the heap file
+     */
+    private void generateIndex(byte[] record, int pageNum, int rowOffset, int defaultHeapFileSize) {
         String colValue = getColValue(record, key);
         if (!isValidStr(colValue)) {
             return;
@@ -229,7 +272,7 @@ public class Hashload implements dbimpl {
         colValue = colValue.trim().toLowerCase();
 
         int hashIndex = indexFor(colValue);
-        int realPosition = pageNum * pageSize + rowOffset;
+        int realPosition = pageNum * defaultHeapFileSize + rowOffset;
 
         //to handle collisions
         boolean hasIndex = false;
@@ -249,16 +292,23 @@ public class Hashload implements dbimpl {
 
     }
 
-
+    /**
+     * @param record data
+     * @param key    the column name of the dataset which is to be indexed
+     * @return the column value of the data
+     */
     private String getColValue(byte[] record, String key) {
         Column columnInfo = Column.getColumnInfo(key);
         String entry = new String(record);
         String colValue = entry.substring(columnInfo.getOffset(), columnInfo.getOffset() + columnInfo.getLength());
-
         return colValue;
     }
 
 
+    /**
+     * @param value the column value recorded in the heap file
+     * @return the index value of the specified text
+     */
     public int indexFor(String value) {
         int h = value.trim().toLowerCase().hashCode();
         h = h ^ (h >>> 16);
@@ -283,5 +333,35 @@ public class Hashload implements dbimpl {
         return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
     }
 
+
+    /**
+     * store the index file
+     */
+    @Deprecated
+    private void saveIndex() {
+        long start = System.currentTimeMillis();
+        File indexFile = loadIndexFile();
+        try {
+            BufferedWriter fw = new BufferedWriter(new FileWriter(indexFile));
+            for (List<IndexInfo> infoList : indexTable) {
+                if (!infoList.isEmpty()) {
+                    for (IndexInfo indexInfo : infoList) {
+                        fw.write(indexInfo.toString());
+                        fw.write(INDEX_SEP);
+                    }
+                }
+                fw.newLine();
+            }
+            fw.flush();
+            fw.close();
+            long end = System.currentTimeMillis();
+            System.out.println("Save index file costs: " + (end - start) + "ms");
+        } catch (FileNotFoundException e) {
+            System.out.println("File: " + indexFile.getName() + " not found.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
 
 }
