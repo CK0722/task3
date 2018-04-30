@@ -35,10 +35,36 @@ public class Hashload implements dbimpl {
      */
     private static final int DEFAULT_BUCKET_SIZE = 400;
 
+    /**
+     * the column to be indexed
+     * you can modify the value in the main function
+     */
     private String key;
+
+    /**
+     * the maxinum bytes of each index page
+     * tests verifies the value cann't be lower than 10240
+     */
     private int pageSize;
+
+    /**
+     * the maxinum size of index table
+     * it will impact hash collision costs
+     * it will call <code>tableSizeFor</code> returns a power of two table size for your given desired capacity
+     */
     private int tableSize;
+
+    /**
+     * the nitial capacity of each bucket of index table
+     * tests verifies 400 is appropriate the data
+     */
     private int bucketSize;
+
+    /**
+     * the bitwise mask
+     * it equals the tableSize minus 1
+     * it can improve the hash efficiency
+     */
     private int modules;
     private List<List<IndexInfo>> indexTable;
 
